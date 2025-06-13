@@ -142,9 +142,9 @@ form.onsubmit = (event) => {
   } else {
     formData.isCompleted = false;
     if (filterMode === FilterMode.COMPLETED) {
-      formData.isHidden = false;
-    } else {
       formData.isHidden = true;
+    } else {
+      formData.isHidden = false;
     }
     todoTasks.unshift(formData);
   }
