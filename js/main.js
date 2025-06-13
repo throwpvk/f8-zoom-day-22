@@ -141,7 +141,11 @@ form.onsubmit = (event) => {
     hideModal();
   } else {
     formData.isCompleted = false;
-    formData.isHidden = false;
+    if (filterMode === FilterMode.COMPLETED) {
+      formData.isHidden = false;
+    } else {
+      formData.isHidden = true;
+    }
     todoTasks.unshift(formData);
   }
   saveTasks();
@@ -204,9 +208,7 @@ activeFilterBtn.onclick = function () {
     filterMode = FilterMode.ALL;
   } else {
     this.classList.add("active");
-    if (completedFilterBtn.classList.contains("active")) {
-      completedFilterBtn.classList.remove("active");
-    }
+    completedFilterBtn.classList.remove("active");
     filterMode = FilterMode.ACTIVE;
   }
   filter(filterMode);
@@ -218,9 +220,7 @@ completedFilterBtn.onclick = function () {
     filterMode = FilterMode.ALL;
   } else {
     this.classList.add("active");
-    if (activeFilterBtn.classList.contains("active")) {
-      activeFilterBtn.classList.remove("active");
-    }
+    activeFilterBtn.classList.remove("active");
     filterMode = FilterMode.COMPLETED;
   }
   filter(filterMode);
