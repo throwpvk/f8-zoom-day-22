@@ -1717,3 +1717,7 @@ body {
     text-align: center;
   }
 }
+
+.hiddenTask {
+  display: none;
+}

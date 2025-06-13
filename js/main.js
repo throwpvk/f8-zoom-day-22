@@ -3,244 +3,227 @@ const $$ = document.querySelectorAll.bind(document);
 
 const addBtn = $(".add-btn");
 const addTaskModal = $("#addTaskModal");
-const cancelBtn = $(
-  "#addTaskModal > div > div.modal-footer > button.btn.btn-secondary"
-);
-const submitBtn = $(
-  "#addTaskModal > div > div.modal-footer > button.btn.btn-primary"
-);
+const cancelBtn = $(".cancelBtn");
+const submitBtn = $(".submitBtn");
+const modalCloseBtn = $(".modal-close");
 const modal = $(".modal");
 const taskGrid = $(".task-grid");
 const form = $(".todo-app-form");
+const modalTitle = $(".modal-title");
+const searchInput = $(".search-input");
+const activeFilterBtn = $(".active-task-btn");
+const completedFilterBtn = $(".completed-task-btn");
 
-let todoTasks = [];
-let isEdit = false;
-let editTaskIndex = -1;
-let editTaskId = -1;
+let editIndex = null;
+let todoTasks = JSON.parse(localStorage.getItem("todoTasks")) ?? [];
+const FilterMode = Object.freeze({
+  ALL: "all",
+  ACTIVE: "active",
+  COMPLETED: "completed",
+});
+let filterMode = FilterMode.ALL;
+
+// fuction
+function openModal() {
+  addTaskModal.className = "modal-overlay show";
+}
+function hideModal() {
+  addTaskModal.className = "modal-overlay";
+  form.reset();
+  modalTitle.innerText = "Add New Task";
+  submitBtn.innerText = "Create Task";
+  modal.scrollTo({ top: 0 });
+}
+function saveTasks() {
+  localStorage.setItem("todoTasks", JSON.stringify(todoTasks));
+}
+function renderTasks(bln = true, msg = "Chưa có công việc nào.") {
+  if (!todoTasks.length || !bln) {
+    taskGrid.innerHTML = `
+            <p>${msg}</p>
+        `;
+    return;
+  } else {
+    const html = todoTasks
+      .map(
+        (task, index) => `
+        <div class="task-card ${task.color} ${
+          task.isCompleted ? "completed" : ""
+        } ${task.isHidden ? "hiddenTask" : ""}">
+        <div class="task-header">
+          <h3 class="task-title">${task.title}</h3>
+          <button class="task-menu">
+            <i class="fa-solid fa-ellipsis fa-icon"></i>
+            <div class="dropdown-menu">
+              <div class="dropdown-item edit-btn" data-index="${index}">
+                <i class="fa-solid fa-pen-to-square fa-icon"></i>
+                Edit
+              </div>
+              <div class="dropdown-item complete-btn" data-index="${index}">
+                <i class="fa-solid fa-check fa-icon"></i>
+                ${task.isCompleted ? "Mark as Active" : "Mark as Complete"} 
+              </div>
+              <div class="dropdown-item delete delete-btn" data-index="${index}">
+                <i class="fa-solid fa-trash fa-icon"></i>
+                Delete
+              </div>
+            </div>
+          </button>
+        </div>
+        <p class="task-description">${task.description}</p>
+        <div class="task-time">${task.startTime} - ${task.endTime}</div>
+      </div>
+    `
+      )
+      .join("");
+
+    taskGrid.innerHTML = html;
+  }
+}
+
+function filter(mode) {
+  let hasFilterTask = false;
+  todoTasks.map((task) => (task.isHidden = false));
+  if (mode === FilterMode.COMPLETED) {
+    todoTasks.map((task) => {
+      if (task.isCompleted === false) {
+        task.isHidden = true;
+      } else {
+        hasFilterTask = true;
+      }
+    });
+    renderTasks(hasFilterTask, "Không có task nào đã hoàn thành.");
+  } else if (mode === FilterMode.ACTIVE) {
+    todoTasks.map((task) => {
+      if (task.isCompleted === true) {
+        task.isHidden = true;
+      } else {
+        hasFilterTask = true;
+      }
+    });
+    renderTasks(hasFilterTask, "Không có task nào đang thực hiện");
+  } else {
+    renderTasks();
+  }
+}
 
 // event
-window.addEventListener("load", function () {
-  taskGrid.innerHTML = "";
-  console.log(taskGrid);
-  todoTasks = [
-    {
-      id: 0,
-      title: "Gửi tặng anh em F8 1 tỷ",
-      description: "Tiền nhiều quá tiêu không hết, nhờ anh em F8 tiêu giúp.",
-      category: "planning",
-      priority: "high",
-      startTime: "09:00",
-      endTime: "10:00",
-      dueDate: "2025-06-11",
-      cardColor: "yellow",
-      isCompleted: false,
-    },
-    {
-      id: 1,
-      title: "Làm bài tập F8",
-      description: "Làm không nổi thì thôi cũng được",
-      category: "planning",
-      priority: "high",
-      startTime: "11:00",
-      endTime: "12:00",
-      dueDate: "2025-06-11",
-      cardColor: "green",
-      isCompleted: false,
-    },
-    {
-      id: 2,
-      title: "Dắt chó đi dạo",
-      description: "Không có chó",
-      category: "planning",
-      priority: "high",
-      startTime: "18:00",
-      endTime: "19:00",
-      dueDate: "2025-06-11",
-      cardColor: "pink",
-      isCompleted: false,
-    },
-  ];
-  renderTasks();
-});
-
-form.addEventListener("submit", function (event) {
-  event.preventDefault();
-});
-
-addBtn.onclick = function () {
-  addTaskModal.className = "modal-overlay show";
-};
-
-cancelBtn.onclick = function () {
-  form.reset();
-  addTaskModal.className = "modal-overlay";
-  resetEditData();
-};
-
+addBtn.onclick = openModal;
+cancelBtn.onclick = hideModal;
+modalCloseBtn.onclick = hideModal;
 addTaskModal.onclick = function (e) {
   if (e.target.id === "addTaskModal") {
-    form.reset();
-    addTaskModal.className = "modal-overlay";
-    resetEditData();
+    hideModal();
   }
 };
-
 modal.addEventListener("transitionend", function (e) {
   if (e.target === modal && addTaskModal.classList.contains("show")) {
-    console.log("focus");
     $("#taskTitle").focus();
   }
 });
 
-submitBtn.onclick = function () {
-  if (isEdit) {
-    submit(editTaskId, editTaskIndex);
-  } else {
-    submit();
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(form));
+  const isExistTitle = todoTasks.some((item) => item.title === formData.title);
+  if (isExistTitle) {
+    alert("Title này đã tồn tại. Vùi lòng đặt title khác.");
+    $("#taskTitle").focus();
+    return;
   }
+
+  if (editIndex) {
+    const isCompleted = todoTasks[editIndex].isCompleted;
+    const isHidden = todoTasks[editIndex].isHidden;
+    todoTasks[editIndex] = formData;
+    todoTasks[editIndex].isCompleted = isCompleted;
+    formData.isHidden = isHidden;
+    hideModal();
+  } else {
+    formData.isCompleted = false;
+    formData.isHidden = false;
+    todoTasks.unshift(formData);
+  }
+  saveTasks();
+  form.reset();
   renderTasks();
 };
 
-// fuction
-function submit(editTaskId = -1, taskIndex = -1) {
-  const taskTitle = $("#taskTitle");
-  const taskDescription = $("#taskDescription");
-  const taskCategory = $("#taskCategory");
-  const taskPriority = $("#taskPriority");
-  const startTime = $("#startTime");
-  const endTime = $("#endTime");
-  const taskDate = $("#taskDate");
-  const taskColor = $("#taskColor");
+taskGrid.onclick = function (event) {
+  const editBtn = event.target.closest(".edit-btn");
+  const deleteBtn = event.target.closest(".delete-btn");
+  const completeBtn = event.target.closest(".complete-btn");
+  if (editBtn) {
+    const taskIndex = editBtn.dataset.index;
+    const task = todoTasks[taskIndex];
+    editIndex = taskIndex;
+    for (key in task) {
+      const value = task[key];
+      const input = $(`[name="${key}"]`);
+      if (input) {
+        input.value = value;
+      }
+    }
+    modalTitle.innerText = "Edit Task";
+    submitBtn.innerText = "Save Task";
+    openModal();
+  }
+  if (deleteBtn) {
+    const taskIndex = deleteBtn.dataset.index;
+    todoTasks.splice(taskIndex, 1);
+    saveTasks();
+    renderTasks();
+  }
+  if (completeBtn) {
+    const taskIndex = completeBtn.dataset.index;
+    const task = todoTasks[taskIndex];
+    task.isCompleted = !task.isCompleted;
+    saveTasks();
+    renderTasks();
+  }
+};
 
-  if (isEdit && taskIndex >= 0 && editTaskId >= 0) {
-    todoTasks[taskIndex].title = taskTitle.value;
-    todoTasks[taskIndex].description = taskDescription.value;
-    todoTasks[taskIndex].category = taskCategory.value.toLowerCase();
-    todoTasks[taskIndex].priority = taskPriority.value.toLowerCase();
-    todoTasks[taskIndex].startTime = startTime.value;
-    todoTasks[taskIndex].endTime = endTime.value;
-    todoTasks[taskIndex].dueDate = taskDate.value;
-    todoTasks[taskIndex].cardColor = taskColor.value.toLowerCase();
-    todoTasks[taskIndex].isCompleted = false;
+searchInput.oninput = function () {
+  const keyword = searchInput.value.toLowerCase().trim();
+  let hasFilterTask = false;
+  todoTasks.map((task) => (task.isHidden = false));
 
-    addTaskModal.className = "modal-overlay";
+  todoTasks.map((task) => {
+    if (!task.title.includes(keyword) && !task.description.includes(keyword)) {
+      task.isHidden = true;
+    } else {
+      hasFilterTask = true;
+    }
+  });
+  renderTasks(hasFilterTask, "Không tìm thấy.");
+};
+
+activeFilterBtn.onclick = function () {
+  if (this.classList.contains("active")) {
+    this.classList.remove("active");
+    filterMode = FilterMode.ALL;
   } else {
-    let newTask = {
-      id: todoTasks.length,
-      title: taskTitle.value,
-      description: taskDescription.value,
-      category: taskCategory.value,
-      priority: taskPriority.value,
-      startTime: startTime.value,
-      endTime: endTime.value,
-      dueDate: taskDate.value,
-      cardColor: taskColor.value,
-      isCompleted: false,
-    };
-
-    todoTasks.unshift(newTask);
+    this.classList.add("active");
+    if (completedFilterBtn.classList.contains("active")) {
+      completedFilterBtn.classList.remove("active");
+    }
+    filterMode = FilterMode.ACTIVE;
   }
+  filter(filterMode);
+};
 
-  console.log(todoTasks);
-  form.reset();
-  resetEditData();
-}
-
-function renderTasks() {
-  let html = "";
-  if (todoTasks.length > 0) {
-    todoTasks.map((task) => {
-      html += `
-        <div class="task-card ${task.cardColor} ${
-        task.isCompleted ? "completed" : ""
-      }">
-          <div class="task-header">
-            <h3 class="task-title">${task.title}</h3>
-            <button class="task-menu">
-              <i class="fa-solid fa-ellipsis fa-icon"></i>
-              <div class="dropdown-menu">
-                <div class="dropdown-item edit" onclick="editTask(${task.id})">
-                  <i class="fa-solid fa-pen-to-square fa-icon"></i>
-                  Edit
-                </div>
-                <div class="dropdown-item complete" onclick="markAsComplete(${
-                  task.id
-                })">
-                  <i class="fa-solid fa-check fa-icon"></i>
-                  Mark as Active
-                </div>
-                <div class="dropdown-item delete" onclick="deleteTask(${
-                  task.id
-                })">
-                  <i class="fa-solid fa-trash fa-icon"></i>
-                  Delete
-                </div>
-              </div>
-            </button>
-          </div>
-          <p class="task-description">
-            ${task.description}
-          </p>
-          <div class="task-time">${task.startTime} - ${task.endTime}</div>
-        </div>
-        `;
-    });
+completedFilterBtn.onclick = function () {
+  if (this.classList.contains("active")) {
+    this.classList.remove("active");
+    filterMode = FilterMode.ALL;
+  } else {
+    this.classList.add("active");
+    if (activeFilterBtn.classList.contains("active")) {
+      activeFilterBtn.classList.remove("active");
+    }
+    filterMode = FilterMode.COMPLETED;
   }
-  taskGrid.innerHTML = html;
-}
+  filter(filterMode);
+};
 
-function editTask(taskId) {
-  const index = todoTasks.findIndex((task) => task.id === taskId);
-  if (index !== -1) {
-    setEditData(taskId, index);
-    addTaskModal.className = "modal-overlay show";
-
-    const taskTitle = $("#taskTitle");
-    const taskDescription = $("#taskDescription");
-    const taskCategory = $("#taskCategory");
-    const taskPriority = $("#taskPriority");
-    const startTime = $("#startTime");
-    const endTime = $("#endTime");
-    const taskDate = $("#taskDate");
-    const taskColor = $("#taskColor");
-
-    taskTitle.value = todoTasks[index].title;
-    taskDescription.value = todoTasks[index].description;
-    taskCategory.value = todoTasks[index].category.toLowerCase();
-    taskPriority.value = todoTasks[index].priority.toLowerCase();
-    startTime.value = todoTasks[index].startTime;
-    endTime.value = todoTasks[index].endTime;
-    taskDate.value = todoTasks[index].dueDate;
-    taskColor.value = todoTasks[index].cardColor.toLowerCase();
-  }
-  console.log("edit task" + taskId);
-}
-function markAsComplete(taskId) {
-  const index = todoTasks.findIndex((task) => task.id === taskId);
-  if (index !== -1) {
-    todoTasks[index].isCompleted = true;
-    renderTasks();
-  }
-  console.log("complete task" + taskId);
-}
-
-function deleteTask(taskId) {
-  const index = todoTasks.findIndex((task) => task.id === taskId);
-  if (index !== -1) {
-    todoTasks.splice(index, 1);
-    renderTasks();
-  }
-  console.log("delete task" + taskId);
-}
-
-function setEditData(id, index) {
-  isEdit = true;
-  editTaskId = id;
-  editTaskIndex = index;
-}
-
-function resetEditData() {
-  isEdit = false;
-  editTaskId = -1;
-  editTaskIndex = -1;
-}
+filter();
